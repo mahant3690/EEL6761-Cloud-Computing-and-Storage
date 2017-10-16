@@ -1,0 +1,34 @@
+package org.apache.spark.examples
+import org.apache.spark.sql.SparkSession
+
+object PageRank {
+
+def main(args: Array[String])
+// First argument: Path to file with page/url => list of outgoing pages/urls
+// Second argument: No. of iterations.
+{
+
+val spark = SparkSession
+      .builder
+      .appName("PageRank")
+      .getOrCreate()
+
+val iters = if (args.length > 1) args(1).toInt else 10  // Iterations.
+val lines = spark.read.textFile(args(0)).rdd		// Read text file into a Resilient 								// Distributed Dataset.
+val pairs = lines.map{ s => val parts = s.split("\\s+") (parts(0), parts(1)) }
+val links = pairs.distinct().groupByKey().cache()
+var ranks = links.mapValues(v => 1.0) // Creates a map [link => pageRank]
+
+for (i <- 1 to iters)
+{
+	val contribs = links.join(ranks)         
+        	 .values                         
+         	.flatMap{ case (urls, rank) => urls.map(url => (url, rank / size))  }
+  	ranks = contribs.reduceByKey(_ + _).mapValues(0.15 + 0.85 * _)
+}
+
+val result = ranks.collect()
+    result.foreach( x => println(x._1 + " has rank: " + x._2 + ".") )
+    spark.stop()
+ }
+}
